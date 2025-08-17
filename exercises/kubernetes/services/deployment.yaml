@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-logger
+  labels:
+    app: http-logger
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: http-logger
+  template:
+    metadata:
+      labels:
+        app: http-logger
+    spec:
+      containers:
+      - name: echosvc
+        image: blacksails/httplogger
+        ports:
+        - containerPort: 8080

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-namespace
+  labels:
+    app: echo-namespace
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: echo-namespace
+  template:
+    metadata:
+      labels:
+        app: echo-namespace
+    spec:
+      containers:
+      - name: echosvc
+        image: blacksails/echosvc
+        args:
+        - "Hello from the namespace called '$(POD_NAMESPACE)'"
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        ports:
+        - containerPort: 8080

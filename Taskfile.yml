@@ -1,0 +1,94 @@
+version: '3'
+
+env:
+  BUILD_DRAFTS: "false"
+  DOCKER_IMAGE: registry.digitalocean.com/blacksails/systematic-k8s-workshop
+
+tasks:
+  default:
+    deps:
+      - build
+
+  static-build:
+    desc: "🔨 Build static files"
+    sources:
+      - web/content/**/*
+    generates:
+      - web/public/**/*
+    cmds:
+      - hugo build
+          --source=web
+          --buildDrafts=${BUILD_DRAFTS}
+
+  static-run:
+    desc: "👟 Run static file server"
+    cmds:
+      - hugo server
+          --source=web
+          --buildDrafts=${BUILD_DRAFTS}
+
+  build:
+    desc: "🔨 Build k8s-workshop binary"
+    deps:
+      - static-build
+    sources:
+      - go.mod
+      - go.sum
+      - "**/*.go"
+    generates:
+      - bin/k8s-workshop
+    cmds:
+      - go build -o bin/k8s-workshop ./cmd/k8s-workshop
+
+  run:
+    desc: "👟 Run k8s-workshop binary"
+    deps:
+      - build
+    cmds:
+      - ./bin/k8s-workshop
+
+  docker-builder:
+    desc: "🐳 Setup docker builder"
+    cmds:
+      - docker buildx create --driver docker-container --name k8s-workshop
+    status:
+      - docker buildx ls --format '{{ printf "{{ .Name }}" }}' | grep k8s-workshop
+
+  docker:
+    desc: "🐳 Build docker image"
+    deps:
+      - docker-builder
+    vars:
+      PUSH: '{{ .PUSH | default "false" }}'
+    cmds:
+      - docker buildx build
+          --file build/container/Dockerfile
+          --builder k8s-workshop
+          --platform linux/amd64,linux/arm64
+          --build-arg BUILD_DRAFTS=${BUILD_DRAFTS}
+          --push={{ .PUSH }}
+          -t ${DOCKER_IMAGE}
+          .
+
+  docker-push:
+    desc: "🐳 Push docker image"
+    deps:
+      - task: docker
+        vars:
+          PUSH: "true"
+
+  docker-run:
+    desc: "🐳 Run docker image"
+    deps:
+      - docker
+    cmds:
+      - docker run
+          --rm
+          -t
+          -p 8080:8080
+          -e K8S_WORKSHOP_USER=${K8S_WORKSHOP_USER}
+          -e K8S_WORKSHOP_PASS=${K8S_WORKSHOP_USER}
+          ${DOCKER_IMAGE}
+    env:
+      K8S_WORKSHOP_USER: admin
+      K8S_WORKSHOP_PASS: admin
